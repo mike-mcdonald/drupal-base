@@ -1,0 +1,85 @@
+# Drupal with PostgreSQL
+#
+# Access via "http://localhost:8080"
+#   (or "http://$(docker-machine ip):8080" if using docker-machine)
+#
+# During initial Drupal setup,
+# Database type: PostgreSQL
+# Database name: postgres
+# Database username: postgres
+# Database password: example
+# ADVANCED OPTIONS; Database host: postgres
+
+version: '3'
+
+services:
+  db:
+    image: mariadb
+    command: --max_allowed_packet=32505856
+    environment:
+      MYSQL_RANDOM_ROOT_PASSWORD: 'yes'
+      MYSQL_DATABASE: pantheon
+      MYSQL_USER: pantheon
+      MYSQL_PASSWORD: pantheon
+    volumes:
+      - ./artifacts:/docker-entrypoint-initdb.d
+      - db:/var/lib/mysql
+    networks:
+      - code-network
+      - db-network
+
+  mail:
+    image: mailhog/mailhog
+    ports:
+      - 1025:1025
+      - 8025:8025
+    restart: always
+    networks:
+      - mail-network
+
+  redis:
+    image: redis
+    networks:
+      - cache-network
+
+  web:
+    image: pbotapps.azurecr.io/nginx:drupal
+    ports:
+      - 80:80
+      - 443:443
+    volumes:
+      - tmp:/tmp
+      - .:/var/www/html:cached
+    networks:
+      - code-network
+      - cache-network
+      - mail-network
+
+  php:
+    image: pbotapps.azurecr.io/php:7.3-fpm
+    environment:
+      CACHE_HOST: redis
+      CACHE_PORT: 6379
+      XDEBUG_CONFIG: remote_host=host.docker.internal
+    volumes:
+      - tmp:/tmp
+      - .:/var/www/html:cached
+    networks:
+      - code-network
+      - cache-network
+      - mail-network
+      - db-network
+
+networks:
+  code-network:
+    driver: bridge
+  db-network:
+    driver: bridge
+  cache-network:
+    driver: bridge
+  mail-network:
+    driver: bridge
+
+volumes:
+  tmp:
+  db:
